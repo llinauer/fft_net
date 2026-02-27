@@ -1,1 +1,27 @@
-# Config file
+description: "Training config for FFT image classifier"
+
+model:
+  hidden_dims: [512, 128]
+  dropout: 0.2
+
+train:
+  dataset_path: null
+  img_size: [128, 128]
+  val_split_fraction: 0.2
+  batch_size: 32
+  learning_rate: 1e-3
+  weight_decay: 0.0
+  n_epochs: 10
+  num_workers: 0
+  seed: 42
+  log_every_n_steps: 10
+
+defaults:
+  - _self_
+  - override hydra/hydra_logging: disabled
+  - override hydra/job_logging: disabled
+
+hydra:
+  output_subdir: null
+  run:
+    dir: .
