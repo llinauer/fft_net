@@ -1,5 +1,11 @@
-#!/usr/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+URL="https://data.caltech.edu/records/65de6-vp158/files/CUB_200_2011.tgz?download=1"
+ARCHIVE="CUB_200_2011.tgz"
+
 # download
-wget https://data.caltech.edu/records/65de6-vp158/files/CUB_200_2011.tgz?download=1 -O CUB_200_2011.tgz
+curl -L "$URL" -o "$ARCHIVE"
+
 # unpack
-tar -xf CUB_200_2011
+tar -xzf "$ARCHIVE"
