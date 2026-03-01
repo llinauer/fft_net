@@ -13,29 +13,8 @@ from .data import BirdImgDataset
 from .model import FFTNet
 
 
-def _infer_class_stats(ds: BirdImgDataset) -> tuple[int, int, int]:
-    labels = [ds._get_class(path) for path in ds.imgs]
-    min_label = min(labels)
-    max_label = max(labels)
-
-    # For CUB-style folders we assume 1-based contiguous labels: 1..N
-    if min_label != 1:
-        raise ValueError(
-            f"Expected 1-based labels (min_label=1), found min_label={min_label}. "
-            "Either rename class folders or relax this check."
-        )
-
-    label_set = set(labels)
-    expected = set(range(1, max_label + 1))
-    if label_set != expected:
-        missing = sorted(expected - label_set)[:10]
-        raise ValueError(
-            "Expected contiguous labels 1..N. "
-            f"Found gaps (first missing: {missing})."
-        )
-
-    num_classes = max_label
-    return min_label, max_label, num_classes
+def _infer_num_classes(ds: BirdImgDataset) -> int:
+    return int(ds.num_classes)
 
 
 def _validate_gpu_index(gpu_index: int) -> None:
@@ -85,7 +64,7 @@ def train_one_epoch(
 
     for step, (x, y) in enumerate(train_loader, start=1):
         x = x.to(device, non_blocking=True)
-        y = (y - 1).to(device, non_blocking=True)  # convert class ids from 1..N to 0..(N-1)
+        y = y.to(device, non_blocking=True)
 
         optimizer.zero_grad()
         logits = model(x)
@@ -121,7 +100,7 @@ def validate_one_epoch(
     with torch.no_grad():
         for x, y in val_loader:
             x = x.to(device, non_blocking=True)
-            y = (y - 1).to(device, non_blocking=True)
+            y = y.to(device, non_blocking=True)
             logits = model(x)
             loss = criterion(logits, y)
 
@@ -149,7 +128,7 @@ def main(cfg: DictConfig) -> None:
 
     img_size = tuple(cfg.train.img_size)
     ds = BirdImgDataset(path=str(dataset_path), img_size=img_size)
-    min_label, max_label, num_classes = _infer_class_stats(ds)
+    num_classes = _infer_num_classes(ds)
 
     val_size = int(len(ds) * float(cfg.train.val_split_fraction))
     train_size = len(ds) - val_size
@@ -221,8 +200,7 @@ def main(cfg: DictConfig) -> None:
         print(
             f"epoch={epoch+1}/{cfg.train.n_epochs} "
             f"train_loss={train_metrics['loss']:.4f} train_acc={train_metrics['acc']:.3f} "
-            f"val_loss={val_metrics['loss']:.4f} val_acc={val_metrics['acc']:.3f} "
-            f"labels=[{min_label}..{max_label}]"
+            f"val_loss={val_metrics['loss']:.4f} val_acc={val_metrics['acc']:.3f}"
         )
 
     logger.close()

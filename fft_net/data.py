@@ -24,6 +24,20 @@ class BirdImgDataset(Dataset):
         self.img_transform = img_transform
         self.img_size = img_size
 
+        # Validate CUB-style labels and normalize to 0-based in __getitem__.
+        labels_1_based = [self._get_class(p) for p in self.imgs]
+        min_label = min(labels_1_based)
+        max_label = max(labels_1_based)
+        if min_label != 1:
+            raise ValueError(f"Expected 1-based labels (min=1), got min={min_label}")
+        expected = set(range(1, max_label + 1))
+        found = set(labels_1_based)
+        if found != expected:
+            missing = sorted(expected - found)[:10]
+            raise ValueError(f"Expected contiguous labels 1..N, missing={missing}")
+
+        self.num_classes = max_label
+
     def __len__(self) -> int:
         return len(self.imgs)
 
@@ -44,5 +58,6 @@ class BirdImgDataset(Dataset):
         if self.img_transform is not None:
             img = self.img_transform(img)
 
-        img_class_t = torch.tensor(self._get_class(img_path), dtype=torch.long)
+        # normalize class ids from 1..N to 0..(N-1)
+        img_class_t = torch.tensor(self._get_class(img_path) - 1, dtype=torch.long)
         return img, img_class_t
