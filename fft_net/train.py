@@ -17,22 +17,55 @@ def _infer_class_stats(ds: BirdImgDataset) -> tuple[int, int, int]:
     labels = [ds._get_class(path) for path in ds.imgs]
     min_label = min(labels)
     max_label = max(labels)
-    num_classes = max_label - min_label + 1
+
+    # For CUB-style folders we assume 1-based contiguous labels: 1..N
+    if min_label != 1:
+        raise ValueError(
+            f"Expected 1-based labels (min_label=1), found min_label={min_label}. "
+            "Either rename class folders or relax this check."
+        )
+
+    label_set = set(labels)
+    expected = set(range(1, max_label + 1))
+    if label_set != expected:
+        missing = sorted(expected - label_set)[:10]
+        raise ValueError(
+            "Expected contiguous labels 1..N. "
+            f"Found gaps (first missing: {missing})."
+        )
+
+    num_classes = max_label
     return min_label, max_label, num_classes
+
+
+def _validate_gpu_index(gpu_index: int) -> None:
+    if gpu_index < 0:
+        raise ValueError(f"train.gpu_index must be >= 0, got {gpu_index}")
 
 
 def _resolve_device(device_cfg: str, gpu_index: int) -> torch.device:
     device_cfg = str(device_cfg).lower()
+    _validate_gpu_index(gpu_index)
+
     if device_cfg == "auto":
         if torch.cuda.is_available():
+            n = torch.cuda.device_count()
+            if gpu_index >= n:
+                raise ValueError(f"train.gpu_index={gpu_index} out of range for {n} CUDA device(s)")
             return torch.device(f"cuda:{gpu_index}")
         return torch.device("cpu")
+
     if device_cfg == "cuda":
         if not torch.cuda.is_available():
             raise RuntimeError("train.device='cuda' was requested but CUDA is not available")
+        n = torch.cuda.device_count()
+        if gpu_index >= n:
+            raise ValueError(f"train.gpu_index={gpu_index} out of range for {n} CUDA device(s)")
         return torch.device(f"cuda:{gpu_index}")
+
     if device_cfg == "cpu":
         return torch.device("cpu")
+
     raise ValueError("train.device must be one of: auto, cpu, cuda")
 
 
