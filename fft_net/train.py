@@ -21,6 +21,21 @@ def _infer_class_stats(ds: BirdImgDataset) -> tuple[int, int, int]:
     return min_label, max_label, num_classes
 
 
+def _resolve_device(device_cfg: str, gpu_index: int) -> torch.device:
+    device_cfg = str(device_cfg).lower()
+    if device_cfg == "auto":
+        if torch.cuda.is_available():
+            return torch.device(f"cuda:{gpu_index}")
+        return torch.device("cpu")
+    if device_cfg == "cuda":
+        if not torch.cuda.is_available():
+            raise RuntimeError("train.device='cuda' was requested but CUDA is not available")
+        return torch.device(f"cuda:{gpu_index}")
+    if device_cfg == "cpu":
+        return torch.device("cpu")
+    raise ValueError("train.device must be one of: auto, cpu, cuda")
+
+
 def train_one_epoch(
     model: nn.Module,
     train_loader: DataLoader,
@@ -29,6 +44,7 @@ def train_one_epoch(
     min_label: int,
     log_every_n_steps: int,
     epoch: int,
+    device: torch.device,
 ) -> dict[str, float]:
     model.train()
     running_loss = 0.0
@@ -36,7 +52,8 @@ def train_one_epoch(
     total = 0
 
     for step, (x, y) in enumerate(train_loader, start=1):
-        y = y - min_label  # convert class ids to 0..(num_classes-1)
+        x = x.to(device, non_blocking=True)
+        y = (y - min_label).to(device, non_blocking=True)  # convert class ids to 0..(num_classes-1)
 
         optimizer.zero_grad()
         logits = model(x)
@@ -63,6 +80,7 @@ def validate_one_epoch(
     val_loader: DataLoader,
     criterion: nn.Module,
     min_label: int,
+    device: torch.device,
 ) -> dict[str, float]:
     model.eval()
     running_loss = 0.0
@@ -71,7 +89,8 @@ def validate_one_epoch(
 
     with torch.no_grad():
         for x, y in val_loader:
-            y = y - min_label
+            x = x.to(device, non_blocking=True)
+            y = (y - min_label).to(device, non_blocking=True)
             logits = model(x)
             loss = criterion(logits, y)
 
@@ -105,17 +124,24 @@ def main(cfg: DictConfig) -> None:
     train_size = len(ds) - val_size
     train_ds, val_ds = random_split(ds, [train_size, val_size])
 
+    device = _resolve_device(cfg.train.device, int(cfg.train.gpu_index))
+    print(f"Using device: {device}")
+
+    use_pin_memory = bool(cfg.train.pin_memory) and device.type == "cuda"
+
     train_loader = DataLoader(
         train_ds,
         batch_size=int(cfg.train.batch_size),
         shuffle=True,
         num_workers=int(cfg.train.num_workers),
+        pin_memory=use_pin_memory,
     )
     val_loader = DataLoader(
         val_ds,
         batch_size=int(cfg.train.batch_size),
         shuffle=False,
         num_workers=int(cfg.train.num_workers),
+        pin_memory=use_pin_memory,
     )
 
     model = FFTNet(
@@ -124,6 +150,8 @@ def main(cfg: DictConfig) -> None:
         hidden_dims=list(cfg.model.hidden_dims),
         dropout=float(cfg.model.dropout),
     )
+
+    model = model.to(device)
 
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(
@@ -143,12 +171,14 @@ def main(cfg: DictConfig) -> None:
             min_label=min_label,
             log_every_n_steps=int(cfg.train.log_every_n_steps),
             epoch=epoch,
+            device=device,
         )
         val_metrics = validate_one_epoch(
             model=model,
             val_loader=val_loader,
             criterion=criterion,
             min_label=min_label,
+            device=device,
         )
 
         logger.add_scalar("Loss/train", train_metrics["loss"], epoch)
