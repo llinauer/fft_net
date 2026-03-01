@@ -74,7 +74,6 @@ def train_one_epoch(
     train_loader: DataLoader,
     criterion: nn.Module,
     optimizer: torch.optim.Optimizer,
-    min_label: int,
     log_every_n_steps: int,
     epoch: int,
     device: torch.device,
@@ -86,7 +85,7 @@ def train_one_epoch(
 
     for step, (x, y) in enumerate(train_loader, start=1):
         x = x.to(device, non_blocking=True)
-        y = (y - min_label).to(device, non_blocking=True)  # convert class ids to 0..(num_classes-1)
+        y = (y - 1).to(device, non_blocking=True)  # convert class ids from 1..N to 0..(N-1)
 
         optimizer.zero_grad()
         logits = model(x)
@@ -112,7 +111,6 @@ def validate_one_epoch(
     model: nn.Module,
     val_loader: DataLoader,
     criterion: nn.Module,
-    min_label: int,
     device: torch.device,
 ) -> dict[str, float]:
     model.eval()
@@ -123,7 +121,7 @@ def validate_one_epoch(
     with torch.no_grad():
         for x, y in val_loader:
             x = x.to(device, non_blocking=True)
-            y = (y - min_label).to(device, non_blocking=True)
+            y = (y - 1).to(device, non_blocking=True)
             logits = model(x)
             loss = criterion(logits, y)
 
@@ -201,7 +199,6 @@ def main(cfg: DictConfig) -> None:
             train_loader=train_loader,
             criterion=criterion,
             optimizer=optimizer,
-            min_label=min_label,
             log_every_n_steps=int(cfg.train.log_every_n_steps),
             epoch=epoch,
             device=device,
@@ -210,7 +207,6 @@ def main(cfg: DictConfig) -> None:
             model=model,
             val_loader=val_loader,
             criterion=criterion,
-            min_label=min_label,
             device=device,
         )
 
