@@ -170,7 +170,23 @@ def main(cfg: DictConfig) -> None:
         weight_decay=float(cfg.train.weight_decay),
     )
 
+    scheduler = None
+    if bool(cfg.train.use_lr_scheduler):
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+            optimizer,
+            T_max=int(cfg.train.n_epochs),
+            eta_min=float(cfg.train.min_learning_rate),
+        )
+
     logger = SummaryWriter(log_dir="logs/fft_net")
+
+    if scheduler is None:
+        print("LR scheduler: disabled")
+    else:
+        print(
+            "LR scheduler: cosine "
+            f"(T_max={int(cfg.train.n_epochs)}, eta_min={float(cfg.train.min_learning_rate)})"
+        )
 
     for epoch in range(int(cfg.train.n_epochs)):
         train_metrics = train_one_epoch(
@@ -189,18 +205,24 @@ def main(cfg: DictConfig) -> None:
             device=device,
         )
 
+        if scheduler is not None:
+            scheduler.step()
+
+        current_lr = optimizer.param_groups[0]["lr"]
+
         logger.add_scalar("Loss/train", train_metrics["loss"], epoch)
         logger.add_scalar("Loss/val", val_metrics["loss"], epoch)
         logger.add_scalar("Accuracy/train", train_metrics["acc"], epoch)
         logger.add_scalar("Accuracy/val", val_metrics["acc"], epoch)
         logger.add_scalar("AccuracyPct/train", train_metrics["acc"] * 100.0, epoch)
         logger.add_scalar("AccuracyPct/val", val_metrics["acc"] * 100.0, epoch)
-        logger.add_scalar("LearningRate", optimizer.param_groups[0]["lr"], epoch)
+        logger.add_scalar("LearningRate", current_lr, epoch)
 
         print(
             f"epoch={epoch+1}/{cfg.train.n_epochs} "
             f"train_loss={train_metrics['loss']:.4f} train_acc={train_metrics['acc']:.3f} "
-            f"val_loss={val_metrics['loss']:.4f} val_acc={val_metrics['acc']:.3f}"
+            f"val_loss={val_metrics['loss']:.4f} val_acc={val_metrics['acc']:.3f} "
+            f"lr={current_lr:.8f}"
         )
 
     logger.close()
