@@ -15,6 +15,9 @@ train:
   num_workers: 0
   seed: 42
   log_every_n_steps: 10
+  device: auto   # auto | cpu | cuda
+  gpu_index: 0
+  pin_memory: true
 
 defaults:
   - _self_
