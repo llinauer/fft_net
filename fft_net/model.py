@@ -38,35 +38,35 @@ class FFTCNN(nn.Module):
     def __init__(
         self,
         num_classes: int,
-        conv_channels: tuple[int, int, int] = (16, 32, 64),
+        conv_channels: tuple[int, ...] = (16, 32, 64),
         dropout: float = 0.2,
     ) -> None:
         super().__init__()
 
-        if len(conv_channels) != 3:
-            raise ValueError(
-                f"FFTCNN expects exactly 3 conv channel values, got {len(conv_channels)}: {conv_channels}"
-            )
+        if len(conv_channels) < 1:
+            raise ValueError("FFTCNN expects at least one conv channel value")
         if any(ch <= 0 for ch in conv_channels):
             raise ValueError(f"All conv channel values must be > 0, got: {conv_channels}")
 
-        c1, c2, c3 = conv_channels
-        self.features = nn.Sequential(
-            nn.Conv2d(1, c1, kernel_size=3, padding=1),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(2),
-            nn.Conv2d(c1, c2, kernel_size=3, padding=1),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(2),
-            nn.Conv2d(c2, c3, kernel_size=3, padding=1),
-            nn.ReLU(inplace=True),
-            nn.AdaptiveAvgPool2d((1, 1)),
-        )
+        layers: list[nn.Module] = []
+        in_channels = 1
+        for out_channels in conv_channels:
+            layers.extend(
+                [
+                    nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1),
+                    nn.ReLU(inplace=True),
+                    nn.MaxPool2d(2),
+                ]
+            )
+            in_channels = out_channels
+
+        layers.append(nn.AdaptiveAvgPool2d((1, 1)))
+        self.features = nn.Sequential(*layers)
 
         self.classifier = nn.Sequential(
             nn.Flatten(),
             nn.Dropout(dropout),
-            nn.Linear(c3, num_classes),
+            nn.Linear(conv_channels[-1], num_classes),
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
