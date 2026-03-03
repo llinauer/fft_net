@@ -1,7 +1,9 @@
 name: Test
+
 on:
   push:
-    - branch: main
+    branches:
+      - main
 
 permissions:
   contents: read
@@ -10,6 +12,7 @@ jobs:
   test:
     name: pytest
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
