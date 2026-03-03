@@ -1,7 +1,9 @@
 description: "Training config for FFT image classifier"
 
 model:
-  hidden_dims: [512, 128]
+  model_type: mlp   # mlp | cnn
+  hidden_dims: [512, 128]      # used for mlp
+  conv_channels: [16, 32, 64]  # used for cnn
   dropout: 0.2
 
 train:
