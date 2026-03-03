@@ -22,6 +22,7 @@ train:
   pin_memory: true
   use_lr_scheduler: true
   min_learning_rate: 1e-6
+  log_dir: logs/fft_net
 
 defaults:
   - _self_
