@@ -10,3 +10,14 @@ dependencies = [
     "torch>=2.9.1",
     "torchvision>=0.24.1",
 ]
+
+[build-system]
+requires = [
+    "setuptools>=61",
+    "setuptools_scm[toml]>=6.2",
+    "wheel"
+]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["fft_net"]
