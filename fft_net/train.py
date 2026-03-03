@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader, random_split
 from torch.utils.tensorboard import SummaryWriter
 
 from .data import BirdImgDataset
-from .model import FFTNet
+from .model import FFTCNN, FFTNet
 
 
 def _infer_num_classes(ds: BirdImgDataset) -> int:
@@ -115,6 +115,27 @@ def validate_one_epoch(
     }
 
 
+def build_model(cfg: DictConfig, img_size: tuple[int, int], num_classes: int) -> nn.Module:
+    model_type = str(cfg.model.model_type).lower()
+
+    if model_type == "mlp":
+        return FFTNet(
+            img_size=img_size,
+            num_classes=num_classes,
+            hidden_dims=list(cfg.model.hidden_dims),
+            dropout=float(cfg.model.dropout),
+        )
+
+    if model_type == "cnn":
+        return FFTCNN(
+            num_classes=num_classes,
+            conv_channels=tuple(cfg.model.conv_channels),
+            dropout=float(cfg.model.dropout),
+        )
+
+    raise ValueError("model.model_type must be one of: mlp, cnn")
+
+
 @hydra.main(version_base=None, config_name="config", config_path=".")
 def main(cfg: DictConfig) -> None:
     if not cfg.train.dataset_path:
@@ -154,13 +175,7 @@ def main(cfg: DictConfig) -> None:
         pin_memory=use_pin_memory,
     )
 
-    model = FFTNet(
-        img_size=img_size,
-        num_classes=num_classes,
-        hidden_dims=list(cfg.model.hidden_dims),
-        dropout=float(cfg.model.dropout),
-    )
-
+    model = build_model(cfg=cfg, img_size=img_size, num_classes=num_classes)
     model = model.to(device)
 
     criterion = nn.CrossEntropyLoss()
