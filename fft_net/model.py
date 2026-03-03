@@ -43,6 +43,13 @@ class FFTCNN(nn.Module):
     ) -> None:
         super().__init__()
 
+        if len(conv_channels) != 3:
+            raise ValueError(
+                f"FFTCNN expects exactly 3 conv channel values, got {len(conv_channels)}: {conv_channels}"
+            )
+        if any(ch <= 0 for ch in conv_channels):
+            raise ValueError(f"All conv channel values must be > 0, got: {conv_channels}")
+
         c1, c2, c3 = conv_channels
         self.features = nn.Sequential(
             nn.Conv2d(1, c1, kernel_size=3, padding=1),
