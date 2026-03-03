@@ -79,7 +79,7 @@ def main() -> None:
         if len(results) >= args.max_runs:
             break
 
-        parts = ["p1", f"model={model_type}", f"lr={lr:g}", f"wd={wd:g}"]
+        parts = [f"model={model_type}", f"lr={lr:g}", f"wd={wd:g}"]
         run_name = _slug(parts)
 
         overrides = [
@@ -135,7 +135,6 @@ def main() -> None:
             break
 
         parts = [
-            "p2",
             f"model={best_model}",
             f"lr={best_lr:g}",
             f"wd={best_wd:g}",
