@@ -3,9 +3,9 @@ Classifying images in frequency space.
 
 ## Vast.ai experiment runner
 
-Use `scripts/vast_run_experiment.py` to spin up a Vast.ai instance, run experiments remotely, and pull back results.
+### 1) Dispatch run
 
-Example:
+Use `scripts/vast_run_experiment.py` to spin up/use a Vast.ai instance, upload code, and start experiments in background.
 
 ```bash
 python scripts/vast_run_experiment.py \
@@ -20,3 +20,25 @@ Notes:
 - script prints rsync commands for pulling `experiments/results.csv` and `logs/experiments/`
 - optional: `--sync-instructions-file <path>` writes those commands to a file
 - optional: `--dry-run` prints planned actions without executing anything
+
+### 2) Check + fetch + optional teardown
+
+Use `scripts/vast_collect_results.py` to check remote status.
+- If run is not finished: prints status and exits.
+- If finished: fetches results/logs.
+- Optionally tears down instance.
+
+```bash
+python scripts/vast_collect_results.py \
+  --instance-id <ID> \
+  --teardown-on-finish
+```
+
+Optional teardown on failed run too:
+
+```bash
+python scripts/vast_collect_results.py \
+  --instance-id <ID> \
+  --teardown-on-finish \
+  --teardown-on-fail
+```
