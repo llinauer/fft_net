@@ -193,7 +193,10 @@ def main(cfg: DictConfig) -> None:
             eta_min=float(cfg.train.min_learning_rate),
         )
 
-    logger = SummaryWriter(log_dir="logs/fft_net")
+    log_dir = Path(str(cfg.train.log_dir))
+    log_dir.mkdir(parents=True, exist_ok=True)
+    logger = SummaryWriter(log_dir=str(log_dir))
+    print(f"TensorBoard log_dir: {log_dir}")
 
     if scheduler is None:
         print("LR scheduler: disabled")
@@ -242,8 +245,9 @@ def main(cfg: DictConfig) -> None:
 
     logger.close()
 
-    torch.save(model.state_dict(), "fft_net_model.pth")
-    print("Saved model to fft_net_model.pth")
+    model_path = log_dir / "fft_net_model.pth"
+    torch.save(model.state_dict(), model_path)
+    print(f"Saved model to {model_path}")
 
 
 if __name__ == "__main__":
