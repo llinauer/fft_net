@@ -5,7 +5,6 @@ import argparse
 import json
 import shlex
 import subprocess
-import sys
 import time
 from pathlib import Path
 
@@ -165,10 +164,14 @@ def main() -> int:
     p.add_argument("--dataset-path", required=True, help="Remote dataset path on instance")
     p.add_argument("--max-runs", type=int, default=30)
     p.add_argument("--seed", type=int, default=42)
-    p.add_argument("--poll-interval", type=int, default=60)
     p.add_argument("--startup-timeout-min", type=int, default=30)
     p.add_argument("--keep-instance", action="store_true")
     p.add_argument("--dry-run", action="store_true", help="Print planned actions and exit")
+    p.add_argument(
+        "--sync-instructions-file",
+        default=None,
+        help="Optional path to write rsync pull commands",
+    )
     args = p.parse_args()
 
     repo_root = Path(__file__).resolve().parents[1]
@@ -192,13 +195,11 @@ def main() -> int:
             f"uv run python scripts/run_experiments.py --dataset-path {args.dataset_path} "
             f"--max-runs {args.max_runs} --seed {args.seed}"
         )
-        print(f"- Would poll every {args.poll_interval}s for completion markers")
-        print(f"- Would sync back results to: {local_results_csv}")
-        print(f"- Would sync back logs to: {local_logs_dir}/")
-        if args.keep_instance:
-            print("- Would keep instance alive after run")
-        else:
-            print("- Would destroy instance if created by this script")
+        print("- Would stop after dispatching remote run")
+        print(f"- Would print rsync command for results -> {local_results_csv}")
+        print(f"- Would print rsync command for logs -> {local_logs_dir}/")
+        if args.sync_instructions_file:
+            print(f"- Would write sync instructions to: {args.sync_instructions_file}")
         return 0
 
     created_here = False
@@ -291,113 +292,54 @@ echo started
         label="remote-start",
     )
 
-    print("Remote experiment started. Polling completion markers...")
-    while True:
-        try:
-            cp = run(
-                ssh_cmd(
-                    host,
-                    port,
-                    user,
-                    args.ssh_key,
-                    f"bash -lc {shlex.quote(f'cd {args.remote_dir} && if [ -f .remote_state/done.ok ]; then echo DONE; elif [ -f .remote_state/done.fail ]; then echo FAIL; else echo RUNNING; fi')}",
-                ),
-                check=True,
-                capture=True,
-            )
-            state = (cp.stdout or "").strip()
-            print(f"Remote state: {state}")
-            if state in {"DONE", "FAIL"}:
-                break
-        except Exception as e:  # noqa: BLE001
-            print(f"Poll warning (keeping alive): {e}")
-        time.sleep(args.poll_interval)
+    print("Remote experiment dispatched successfully.")
 
-    # Best-effort download with retries; never terminate hard on sync failure.
-    download_failed = False
-    try:
-        retry(
-            lambda: run(
-                rsync_cmd(
-                    f"{args.remote_dir}/experiments/results.csv",
-                    str(local_results_csv),
-                    host,
-                    port,
-                    user,
-                    args.ssh_key,
-                    to_remote=False,
-                ),
-                check=True,
-                capture=True,
-            ),
-            retries=8,
-            delay_s=10,
-            label="rsync-results",
+    results_pull_cmd = " ".join(
+        rsync_cmd(
+            f"{args.remote_dir}/experiments/results.csv",
+            str(local_results_csv),
+            host,
+            port,
+            user,
+            args.ssh_key,
+            to_remote=False,
         )
-    except Exception as e:  # noqa: BLE001
-        download_failed = True
-        print(f"WARNING: results.csv sync failed: {e}")
+    )
+    logs_pull_cmd = " ".join(
+        rsync_cmd(
+            f"{args.remote_dir}/logs/experiments/",
+            str(local_logs_dir) + "/",
+            host,
+            port,
+            user,
+            args.ssh_key,
+            to_remote=False,
+        )
+    )
 
-    try:
-        retry(
-            lambda: run(
-                rsync_cmd(
-                    f"{args.remote_dir}/logs/experiments/",
-                    str(local_logs_dir) + "/",
-                    host,
-                    port,
-                    user,
-                    args.ssh_key,
-                    to_remote=False,
-                ),
-                check=True,
-                capture=True,
-            ),
-            retries=8,
-            delay_s=10,
-            label="rsync-logs",
-        )
-    except Exception as e:  # noqa: BLE001
-        download_failed = True
-        print(f"WARNING: log sync failed: {e}")
+    lines = [
+        "# Run these later to retrieve results",
+        results_pull_cmd,
+        logs_pull_cmd,
+    ]
 
-    if download_failed:
-        print("\nManual sync fallback commands:")
-        print(
-            " ".join(
-                rsync_cmd(
-                    f"{args.remote_dir}/experiments/results.csv",
-                    str(local_results_csv),
-                    host,
-                    port,
-                    user,
-                    args.ssh_key,
-                    to_remote=False,
-                )
-            )
-        )
-        print(
-            " ".join(
-                rsync_cmd(
-                    f"{args.remote_dir}/logs/experiments/",
-                    str(local_logs_dir) + "/",
-                    host,
-                    port,
-                    user,
-                    args.ssh_key,
-                    to_remote=False,
-                )
-            )
-        )
+    print("\nSync commands:")
+    print(results_pull_cmd)
+    print(logs_pull_cmd)
+
+    if args.sync_instructions_file:
+        out = Path(args.sync_instructions_file)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        print(f"Wrote sync instructions to {out}")
 
     if created_here and not args.keep_instance:
-        try:
-            run(["vastai", "destroy", "instance", str(args.instance_id)], check=True, capture=True)
-            print(f"Destroyed instance {args.instance_id}")
-        except Exception as e:  # noqa: BLE001
-            print(f"WARNING: failed to destroy instance {args.instance_id}: {e}")
+        print(
+            f"NOTE: instance {args.instance_id} was created by this script and is still running. "
+            "Use --keep-instance explicitly for clarity, or destroy manually when done."
+        )
 
-    print("Completed orchestration.")
+    print("Done (dispatch-only mode).")
     return 0
 
 

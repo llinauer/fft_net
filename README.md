@@ -15,6 +15,8 @@ python scripts/vast_run_experiment.py \
 ```
 
 Notes:
-- resilient retries are built in for search/create/ssh/rsync steps
-- SSH failures during polling do **not** terminate the run
-- if rsync keeps failing, the script prints manual fallback rsync commands
+- resilient retries are built in for search/create/ssh/bootstrap/dispatch steps
+- script runs in **dispatch-only** mode: it starts remote experiments and exits
+- script prints rsync commands for pulling `experiments/results.csv` and `logs/experiments/`
+- optional: `--sync-instructions-file <path>` writes those commands to a file
+- optional: `--dry-run` prints planned actions without executing anything
