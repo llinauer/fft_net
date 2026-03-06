@@ -168,6 +168,7 @@ def main() -> int:
     p.add_argument("--poll-interval", type=int, default=60)
     p.add_argument("--startup-timeout-min", type=int, default=30)
     p.add_argument("--keep-instance", action="store_true")
+    p.add_argument("--dry-run", action="store_true", help="Print planned actions and exit")
     args = p.parse_args()
 
     repo_root = Path(__file__).resolve().parents[1]
@@ -175,6 +176,30 @@ def main() -> int:
     local_results_csv = repo_root / "experiments" / "results.csv"
     local_logs_dir.mkdir(parents=True, exist_ok=True)
     local_results_csv.parent.mkdir(parents=True, exist_ok=True)
+
+    if args.dry_run:
+        print("DRY RUN: no Vast/SSH/rsync commands will be executed.")
+        if args.instance_id is None:
+            print(f"- Would search offer with query: {args.search_query}")
+            print(f"- Would create instance using image={args.image} disk_gb={args.disk_gb}")
+        else:
+            print(f"- Would use existing instance_id={args.instance_id}")
+        print("- Would wait for SSH readiness")
+        print(f"- Would rsync upload repo -> {args.remote_dir}")
+        print("- Would bootstrap uv + sync dependencies on remote")
+        print(
+            "- Would run experiments: "
+            f"uv run python scripts/run_experiments.py --dataset-path {args.dataset_path} "
+            f"--max-runs {args.max_runs} --seed {args.seed}"
+        )
+        print(f"- Would poll every {args.poll_interval}s for completion markers")
+        print(f"- Would sync back results to: {local_results_csv}")
+        print(f"- Would sync back logs to: {local_logs_dir}/")
+        if args.keep_instance:
+            print("- Would keep instance alive after run")
+        else:
+            print("- Would destroy instance if created by this script")
+        return 0
 
     created_here = False
 
