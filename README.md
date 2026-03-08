@@ -1,6 +1,29 @@
 # fft_net
 Classifying images in frequency space.
 
+## ILSVRC2012 (ImageNet) data prep
+
+You must provide the official archives yourself (license/terms required):
+- `ILSVRC2012_img_train.tar`
+- `ILSVRC2012_img_val.tar`
+
+Then prepare train/val class-folder layout:
+
+```bash
+python scripts/prepare_ilsvrc2012.py \
+  --train-tar /path/to/ILSVRC2012_img_train.tar \
+  --val-tar /path/to/ILSVRC2012_img_val.tar \
+  --out-dir data/ilsvrc2012
+```
+
+Train with explicit train/val splits:
+
+```bash
+python -m fft_net.train \
+  train.dataset_path=data/ilsvrc2012/train \
+  train.val_dataset_path=data/ilsvrc2012/val
+```
+
 ## Vast.ai experiment runner
 
 ### 1) Dispatch run
