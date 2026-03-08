@@ -9,11 +9,11 @@ from torch import nn
 from torch.utils.data import DataLoader, random_split
 from torch.utils.tensorboard import SummaryWriter
 
-from .data import BirdImgDataset
+from .data import ImageFolderDataset
 from .model import FFTCNN, FFTNet
 
 
-def _infer_num_classes(ds: BirdImgDataset) -> int:
+def _infer_num_classes(ds: ImageFolderDataset) -> int:
     return int(ds.num_classes)
 
 
@@ -148,13 +148,13 @@ def main(cfg: DictConfig) -> None:
     torch.manual_seed(int(cfg.train.seed))
 
     img_size = tuple(cfg.train.img_size)
-    train_ds_full = BirdImgDataset(path=str(dataset_path), img_size=img_size)
+    train_ds_full = ImageFolderDataset(path=str(dataset_path), img_size=img_size)
 
     if cfg.train.val_dataset_path:
         val_dataset_path = Path(cfg.train.val_dataset_path)
         if not val_dataset_path.exists():
             raise FileNotFoundError(f"Validation dataset path does not exist: {val_dataset_path}")
-        val_ds = BirdImgDataset(path=str(val_dataset_path), img_size=img_size)
+        val_ds = ImageFolderDataset(path=str(val_dataset_path), img_size=img_size)
         train_ds = train_ds_full
         num_classes = _infer_num_classes(train_ds_full)
         if val_ds.num_classes != num_classes:

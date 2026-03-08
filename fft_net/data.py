@@ -7,7 +7,7 @@ from torchvision.io import ImageReadMode, read_image
 from torchvision.transforms import Resize
 
 
-class BirdImgDataset(Dataset):
+class ImageFolderDataset(Dataset):
     """Generic image folder dataset.
 
     Expected structure: <root>/<class_name>/*.jpg (or jpeg/png).
@@ -61,3 +61,7 @@ class BirdImgDataset(Dataset):
 
         img_class_t = torch.tensor(self._get_class_idx(img_path), dtype=torch.long)
         return img, img_class_t
+
+
+# Backward compatibility alias
+BirdImgDataset = ImageFolderDataset
