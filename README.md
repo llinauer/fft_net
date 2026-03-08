@@ -24,6 +24,26 @@ python -m fft_net.train \
   train.val_dataset_path=data/ilsvrc2012/val
 ```
 
+## CUB deterministic split helper
+
+Create reproducible train/val splits from `CUB_200_2011/images`:
+
+```bash
+python scripts/split_cub.py \
+  --input-dir /path/to/CUB_200_2011/images \
+  --out-dir data/cub_split \
+  --val-fraction 0.2 \
+  --seed 42
+```
+
+Then train with explicit split paths:
+
+```bash
+python -m fft_net.train \
+  train.dataset_path=data/cub_split/train \
+  train.val_dataset_path=data/cub_split/val
+```
+
 ## Vast.ai experiment runner
 
 ### 1) Dispatch run
