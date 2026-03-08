@@ -61,7 +61,3 @@ class ImageFolderDataset(Dataset):
 
         img_class_t = torch.tensor(self._get_class_idx(img_path), dtype=torch.long)
         return img, img_class_t
-
-
-# Backward compatibility alias
-BirdImgDataset = ImageFolderDataset
