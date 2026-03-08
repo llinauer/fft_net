@@ -10,6 +10,7 @@ train:
   dataset_path: null
   img_size: [128, 128]
   val_split_fraction: 0.2
+  val_dataset_path: null   # optional explicit val split path
   batch_size: 32
   learning_rate: 1e-3
   weight_decay: 0.0

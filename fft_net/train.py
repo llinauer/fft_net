@@ -148,12 +148,25 @@ def main(cfg: DictConfig) -> None:
     torch.manual_seed(int(cfg.train.seed))
 
     img_size = tuple(cfg.train.img_size)
-    ds = BirdImgDataset(path=str(dataset_path), img_size=img_size)
-    num_classes = _infer_num_classes(ds)
+    train_ds_full = BirdImgDataset(path=str(dataset_path), img_size=img_size)
 
-    val_size = int(len(ds) * float(cfg.train.val_split_fraction))
-    train_size = len(ds) - val_size
-    train_ds, val_ds = random_split(ds, [train_size, val_size])
+    if cfg.train.val_dataset_path:
+        val_dataset_path = Path(cfg.train.val_dataset_path)
+        if not val_dataset_path.exists():
+            raise FileNotFoundError(f"Validation dataset path does not exist: {val_dataset_path}")
+        val_ds = BirdImgDataset(path=str(val_dataset_path), img_size=img_size)
+        train_ds = train_ds_full
+        num_classes = _infer_num_classes(train_ds_full)
+        if val_ds.num_classes != num_classes:
+            raise ValueError(
+                f"Class-count mismatch: train={num_classes}, val={val_ds.num_classes}. "
+                "Ensure both splits share identical class folders."
+            )
+    else:
+        num_classes = _infer_num_classes(train_ds_full)
+        val_size = int(len(train_ds_full) * float(cfg.train.val_split_fraction))
+        train_size = len(train_ds_full) - val_size
+        train_ds, val_ds = random_split(train_ds_full, [train_size, val_size])
 
     device = _resolve_device(cfg.train.device, int(cfg.train.gpu_index))
     print(f"Using device: {device}")
