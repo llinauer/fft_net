@@ -7,7 +7,13 @@ from torchvision.io import ImageReadMode, read_image
 from torchvision.transforms import Resize
 
 
-class BirdImgDataset(Dataset):
+class ImageFolderDataset(Dataset):
+    """Generic image folder dataset.
+
+    Expected structure: <root>/<class_name>/*.jpg (or jpeg/png).
+    Class ids are assigned by sorted class_name order, 0-based.
+    """
+
     def __init__(
         self,
         path: str,
@@ -18,34 +24,29 @@ class BirdImgDataset(Dataset):
         assert data_path.exists(), f"Path {path} does not exist"
         assert data_path.is_dir(), f"Path {path} is not a directory"
 
-        self.imgs = sorted(data_path.glob("**/*.jpg"))
-        assert self.imgs, f"No .jpg files found in {path}"
+        exts = ("*.jpg", "*.jpeg", "*.png")
+        imgs: list[Path] = []
+        for ext in exts:
+            imgs.extend(data_path.glob(f"**/{ext}"))
+        self.imgs = sorted(imgs)
+        assert self.imgs, f"No image files found in {path}"
 
         self.img_transform = img_transform
         self.img_size = img_size
 
-        # Validate CUB-style labels and normalize to 0-based in __getitem__.
-        labels_1_based = [self._get_class(p) for p in self.imgs]
-        min_label = min(labels_1_based)
-        max_label = max(labels_1_based)
-        if min_label != 1:
-            raise ValueError(f"Expected 1-based labels (min=1), got min={min_label}")
-        expected = set(range(1, max_label + 1))
-        found = set(labels_1_based)
-        if found != expected:
-            missing = sorted(expected - found)[:10]
-            raise ValueError(f"Expected contiguous labels 1..N, missing={missing}")
-
-        self.num_classes = max_label
+        class_names = sorted({p.parent.name for p in self.imgs})
+        self.class_to_idx = {name: idx for idx, name in enumerate(class_names)}
+        self.idx_to_class = {idx: name for name, idx in self.class_to_idx.items()}
+        self.num_classes = len(self.class_to_idx)
 
     def __len__(self) -> int:
         return len(self.imgs)
 
-    @staticmethod
-    def _get_class(file_path: Path) -> int:
-        dir_name = file_path.parent.name
-        class_idx, _class_name = dir_name.split(".", maxsplit=1)
-        return int(class_idx)
+    def _get_class_name(self, file_path: Path) -> str:
+        return file_path.parent.name
+
+    def _get_class_idx(self, file_path: Path) -> int:
+        return self.class_to_idx[self._get_class_name(file_path)]
 
     def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor]:
         img_path = self.imgs[idx]
@@ -58,6 +59,5 @@ class BirdImgDataset(Dataset):
         if self.img_transform is not None:
             img = self.img_transform(img)
 
-        # normalize class ids from 1..N to 0..(N-1)
-        img_class_t = torch.tensor(self._get_class(img_path) - 1, dtype=torch.long)
+        img_class_t = torch.tensor(self._get_class_idx(img_path), dtype=torch.long)
         return img, img_class_t
